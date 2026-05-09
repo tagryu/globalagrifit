@@ -73,11 +73,13 @@
   }
   /* Distribute heading lines evenly */
   h1, h2, h3 { text-wrap: balance; }
-  /* Hero headline: always 3 lines, fluid sizing */
+  /* Hero headline: always 3 lines, fluid sizing.
+     Cap kept tight so the longest line ("우리 농기구가 통하는 곳을")
+     never overflows on standard desktop widths. */
   .hero-title {
-    font-size: clamp(1.625rem, 6vw, 4.5rem);
-    line-height: 1.12;
-    letter-spacing: -0.025em;
+    font-size: clamp(1.5rem, 4.2vw, 3.5rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
   }
   .hero-title > .line {
     display: block;
@@ -96,13 +98,9 @@
     padding-top: 5rem;
     padding-bottom: 3rem;
   }
-  /* Bigger headings on wide screens so they don't look small */
-  @media (min-width: 1536px) {
-    .hero-title { font-size: clamp(2.5rem, 5.5vw, 6.5rem); }
-  }
+  /* Wide-screen tweaks (kept conservative) */
   @media (min-width: 1920px) {
-    body { font-size: 17px; }
-    .section-title { font-size: clamp(3rem, 4vw, 5rem) !important; }
+    .hero-title { font-size: clamp(2rem, 4vw, 4.5rem); }
   }
   /* Allow inner-section scrolling when content is taller than viewport */
   @media (max-height: 720px) {
