@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GlobalAgriFit — 전 세계 농지에서 우리 농기구가 통하는 곳을 30초 만에</title>
+<meta name="description" content="농기구 스펙을 입력하면 전 세계 토양·경사·기후·작물 데이터에 매칭하여 적합 농지를 3D 지구본 위에 시각화하는 B2B SaaS." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Pretendard', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+        colors: {
+          earth: {
+            50:  '#f0fdf4',
+            100: '#dcfce7',
+            200: '#bbf7d0',
+            300: '#86efac',
+            400: '#4ade80',
+            500: '#22c55e',
+            600: '#16a34a',
+            700: '#15803d',
+            800: '#166534',
+            900: '#14532d',
+            950: '#052e16',
+          },
+          soil: {
+            500: '#a16207',
+            600: '#854d0e',
+            700: '#713f12',
+          }
+        },
+        animation: {
+          'spin-slow': 'spin 60s linear infinite',
+          'pulse-slow': 'pulse 4s ease-in-out infinite',
+          'float': 'float 6s ease-in-out infinite',
+          'fade-up': 'fadeUp 0.8s ease-out forwards',
+        },
+        keyframes: {
+          float: {
+            '0%, 100%': { transform: 'translateY(0px)' },
+            '50%': { transform: 'translateY(-12px)' },
+          },
+          fadeUp: {
+            '0%': { opacity: '0', transform: 'translateY(20px)' },
+            '100%': { opacity: '1', transform: 'translateY(0)' },
+          }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Pretendard', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #0a0e0a;
+    color: #e7f5e9;
+  }
+  /* Grid background */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(34,197,94,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,197,94,0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  /* Globe glow */
+  .globe-glow {
+    box-shadow:
+      0 0 80px rgba(34,197,94,0.35),
+      0 0 160px rgba(34,197,94,0.18),
+      inset -30px -30px 80px rgba(0,0,0,0.6),
+      inset 20px 20px 60px rgba(34,197,94,0.15);
+  }
+  /* Section reveal */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0e0a; }
+  ::-webkit-scrollbar-thumb { background: #15803d; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #16a34a; }
+  /* Card */
+  .glass {
+    background: rgba(20, 83, 45, 0.12);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(74, 222, 128, 0.18);
+  }
+  .glass:hover {
+    border-color: rgba(74, 222, 128, 0.42);
+  }
+  /* Gradient text */
+  .grad-text {
+    background: linear-gradient(135deg, #4ade80 0%, #fde047 50%, #f97316 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* Marker pulse */
+  .marker {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .marker::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    animation: ping 2.5s cubic-bezier(0,0,0.2,1) infinite;
+    opacity: 0;
+  }
+  @keyframes ping {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    80%, 100% { transform: scale(2.2); opacity: 0; }
+  }
+  /* Number tickers */
+  .ticker {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Hero gradient */
+  .hero-gradient {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(34,197,94,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(234,179,8,0.10) 0%, transparent 60%),
+      #0a0e0a;
+  }
+  /* Mock app */
+  .mock-shadow {
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(74,222,128,0.18),
+      0 0 80px rgba(34,197,94,0.12);
+  }
+  /* Globe latitudes */
+  .lat-line {
+    position: absolute;
+    left: 50%;
+    width: 100%;
+    border-top: 1px solid rgba(74,222,128,0.18);
+    border-radius: 50%;
+    transform: translateX(-50%);
+  }
+</style>
+</head>
+
+<body class="hero-gradient">
+
+<!-- ============== NAV ============== -->
+<nav class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-black/40 border-b border-earth-900/40">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-2 group">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-earth-400 to-earth-700 globe-glow flex items-center justify-center text-sm">🌍</div>
+      <span class="font-bold text-lg tracking-tight">GlobalAgriFit</span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm text-earth-100/70">
+      <a href="#problem" class="hover:text-earth-300 transition">Problem</a>
+      <a href="#solution" class="hover:text-earth-300 transition">Solution</a>
+      <a href="#product" class="hover:text-earth-300 transition">Product</a>
+      <a href="#market" class="hover:text-earth-300 transition">Market</a>
+      <a href="#roadmap" class="hover:text-earth-300 transition">Roadmap</a>
+      <a href="#team" class="hover:text-earth-300 transition">Team</a>
+    </div>
+    <a href="#contact" class="text-sm bg-earth-500 hover:bg-earth-400 text-earth-950 font-semibold px-4 py-2 rounded-lg transition">
+      Contact →
+    </a>
+  </div>
+</nav>
+
+<!-- ============== HERO ============== -->
+<section id="top" class="relative min-h-screen pt-32 pb-24 overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-50"></div>
+  <div class="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+
+    <!-- Left: copy -->
+    <div class="space-y-8">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-earth-500/10 border border-earth-500/30 text-earth-300 text-xs font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-earth-400 animate-pulse"></span>
+        2026 한양대 해커톤 · IR Pitch
+      </div>
+
+      <h1 class="text-5xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight">
+        전 세계 농지에서<br/>
+        <span class="grad-text">우리 농기구가 통하는 곳</span>을<br/>
+        <span class="text-earth-100">30초 만에.</span>
+      </h1>
+
+      <p class="text-lg md:text-xl text-earth-100/70 leading-relaxed max-w-xl">
+        농기구 제조사가 자사 장비 스펙을 입력하면, 전 세계 토양·경사·기후·작물 데이터에 매칭해
+        <span class="text-earth-300 font-semibold">적합 농지를 3D 지구본 위에 색칠</span>해 보여주는 B2B SaaS.
+      </p>
+
+      <div class="flex flex-wrap gap-4">
+        <a href="#product" class="px-6 py-3.5 rounded-xl bg-earth-500 hover:bg-earth-400 text-earth-950 font-bold transition flex items-center gap-2 group">
+          제품 데모 보기
+          <span class="group-hover:translate-x-1 transition">→</span>
+        </a>
+        <a href="#problem" class="px-6 py-3.5 rounded-xl border border-earth-600/50 hover:border-earth-400 text-earth-100 font-semibold transition">
+          왜 만드는가
+        </a>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-3 gap-4 pt-8 border-t border-earth-900/60">
+        <div>
+          <div class="text-3xl font-black text-earth-300 ticker">$160B</div>
+          <div class="text-xs text-earth-100/50 mt-1">글로벌 농기계 시장 (2024)</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black text-earth-300 ticker">30+</div>
+          <div class="text-xs text-earth-100/50 mt-1">큐레이션 농업 지역 (MVP)</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black text-earth-300 ticker">~30s</div>
+          <div class="text-xs text-earth-100/50 mt-1">스펙 입력 → 시장 사이징</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Globe -->
+    <div class="relative flex items-center justify-center min-h-[480px]">
+      <!-- Outer rings -->
+      <div class="absolute w-[420px] h-[420px] rounded-full border border-earth-700/30 animate-spin-slow"></div>
+      <div class="absolute w-[500px] h-[500px] rounded-full border border-earth-700/20" style="animation: spin 90s linear infinite reverse;"></div>
+
+      <!-- Globe -->
+      <div class="relative w-[360px] h-[360px] rounded-full globe-glow animate-float"
+           style="background:
+             radial-gradient(circle at 30% 30%, #16a34a 0%, #15803d 25%, #14532d 50%, #052e16 80%);">
+
+        <!-- Continents (simplified shapes) -->
+        <svg viewBox="0 0 360 360" class="absolute inset-0 w-full h-full opacity-70">
+          <defs>
+            <radialGradient id="hl" cx="30%" cy="30%">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.4)"/>
+              <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+            </radialGradient>
+          </defs>
+          <!-- Highlight -->
+          <circle cx="180" cy="180" r="178" fill="url(#hl)"/>
+          <!-- Latitude lines -->
+          <ellipse cx="180" cy="180" rx="178" ry="40" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+          <ellipse cx="180" cy="180" rx="178" ry="90" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+          <ellipse cx="180" cy="180" rx="178" ry="140" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+          <!-- Longitude -->
+          <ellipse cx="180" cy="180" rx="40" ry="178" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+          <ellipse cx="180" cy="180" rx="90" ry="178" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+          <ellipse cx="180" cy="180" rx="140" ry="178" fill="none" stroke="rgba(74,222,128,0.15)" stroke-width="1"/>
+        </svg>
+
+        <!-- Region markers (simulating fit zones) -->
+        <!-- North America - Iowa (green) -->
+        <div class="marker text-earth-400" style="left: 30%; top: 38%; background: #4ade80;"></div>
+        <!-- South America - Pampas -->
+        <div class="marker text-earth-400" style="left: 36%; top: 70%; background: #4ade80;"></div>
+        <!-- Europe - Po Valley -->
+        <div class="marker text-yellow-400" style="left: 53%; top: 36%; background: #facc15;"></div>
+        <!-- Ukraine Chernozem -->
+        <div class="marker text-earth-400" style="left: 60%; top: 34%; background: #4ade80;"></div>
+        <!-- India Punjab -->
+        <div class="marker text-yellow-400" style="left: 68%; top: 45%; background: #facc15;"></div>
+        <!-- China Heilongjiang -->
+        <div class="marker text-earth-400" style="left: 76%; top: 36%; background: #4ade80;"></div>
+        <!-- Australia NSW -->
+        <div class="marker text-orange-400" style="left: 80%; top: 72%; background: #fb923c;"></div>
+        <!-- Africa Nile -->
+        <div class="marker text-yellow-400" style="left: 56%; top: 50%; background: #facc15;"></div>
+
+        <!-- Inner shadow overlay -->
+        <div class="absolute inset-0 rounded-full" style="background: radial-gradient(circle at 70% 70%, transparent 30%, rgba(0,0,0,0.45) 80%);"></div>
+      </div>
+
+      <!-- Floating tooltip -->
+      <div class="absolute top-6 right-0 glass rounded-xl p-3 text-xs">
+        <div class="text-earth-300 font-semibold">Iowa, USA</div>
+        <div class="text-earth-100/70">적합도 <span class="text-earth-300 font-bold">92%</span></div>
+        <div class="text-earth-100/50 mt-1">loam · continental · 2°</div>
+      </div>
+      <div class="absolute bottom-12 left-0 glass rounded-xl p-3 text-xs">
+        <div class="text-yellow-300 font-semibold">Po Valley, IT</div>
+        <div class="text-earth-100/70">적합도 <span class="text-yellow-300 font-bold">68%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll hint -->
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-earth-100/40 text-xs flex flex-col items-center gap-2 animate-pulse-slow">
+    <span>아래로 스크롤</span>
+    <span>↓</span>
+  </div>
+</section>
+
+
+<!-- ============== PROBLEM ============== -->
+<section id="problem" class="relative py-32 border-t border-earth-900/60">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">01 · PROBLEM</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        매번 같은 질문, 매번 수작업.<br/>
+        <span class="text-earth-100/60">바이어 상담의 첫 30분은 늘 똑같다.</span>
+      </h2>
+    </div>
+
+    <div class="reveal mt-12 glass rounded-2xl p-8 md:p-10 border-l-4 border-l-earth-500">
+      <div class="text-earth-300 text-xs font-semibold tracking-widest mb-3">FOUNDER NOTE · 전북통상닥터</div>
+      <p class="text-lg md:text-xl leading-relaxed text-earth-100/90">
+        “전북통상닥터로 활동하면서 여러 농기계 회사의 수출을 지원해주고 있는데,
+        잠재적 바이어와의 상담을 하다보면 <span class="text-earth-300 font-semibold">매번 처음 확인하는 것이
+        토양의 종류와 경사도, 그리고 농작물에 대한 정보</span>를 파악하고
+        해당 정보가 판매하고자 하는 제품 사양에 맞는지 확인하는 일이었다.
+        이런 Pin Point를 디지털로 극복하고자 한다.”
+      </p>
+    </div>
+
+    <div class="reveal grid md:grid-cols-3 gap-6 mt-12">
+      <div class="glass rounded-2xl p-6 transition-all hover:-translate-y-1">
+        <div class="text-4xl mb-3">📋</div>
+        <div class="text-earth-300 font-bold mb-2">반복적인 수작업</div>
+        <p class="text-sm text-earth-100/70 leading-relaxed">
+          상담마다 토양·경사·기후·작물을 일일이 검색하고 엑셀에 정리.
+          담당자가 바뀌면 노하우가 휘발된다.
+        </p>
+      </div>
+      <div class="glass rounded-2xl p-6 transition-all hover:-translate-y-1">
+        <div class="text-4xl mb-3">🌐</div>
+        <div class="text-earth-300 font-bold mb-2">분산된 데이터</div>
+        <p class="text-sm text-earth-100/70 leading-relaxed">
+          SoilGrids, WorldClim, FAO GAEZ는 따로따로 존재.
+          농기구 영업 담당자가 직접 통합·해석할 수 없다.
+        </p>
+      </div>
+      <div class="glass rounded-2xl p-6 transition-all hover:-translate-y-1">
+        <div class="text-4xl mb-3">🎯</div>
+        <div class="text-earth-300 font-bold mb-2">Pin Point의 부재</div>
+        <p class="text-sm text-earth-100/70 leading-relaxed">
+          "어디에 팔면 되는가"에 대한 시각적 답이 없으니,
+          신제품 출시 전 시장 사이징도 직관에 의존.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== SOLUTION ============== -->
+<section id="solution" class="relative py-32 border-t border-earth-900/60 overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-30"></div>
+  <div class="relative max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">02 · SOLUTION</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        스펙 입력 → 글로벌 데이터 매칭 →<br/>
+        <span class="grad-text">3D 지구본 위에 시각화.</span>
+      </h2>
+      <p class="text-lg text-earth-100/70 max-w-3xl">
+        제품 사양 한 번 넣으면 토양·경사·기후·작물 데이터에 자동 매칭.
+        적합도(fit_score)에 따라 🟢/🟡/🔴로 색칠된 글로브가 시장을 즉시 보여준다.
+      </p>
+    </div>
+
+    <!-- Flow diagram -->
+    <div class="reveal mt-16 grid md:grid-cols-4 gap-4">
+      <div class="glass rounded-xl p-6 text-center relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-earth-500 text-earth-950 font-black text-sm flex items-center justify-center">1</div>
+        <div class="text-3xl mb-3 mt-2">⚙️</div>
+        <div class="font-bold text-earth-200 mb-2">스펙 입력</div>
+        <p class="text-xs text-earth-100/60">HP·최대경사·호환토양·기후·온도 범위</p>
+      </div>
+      <div class="glass rounded-xl p-6 text-center relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-earth-500 text-earth-950 font-black text-sm flex items-center justify-center">2</div>
+        <div class="text-3xl mb-3 mt-2">🔗</div>
+        <div class="font-bold text-earth-200 mb-2">데이터 매칭</div>
+        <p class="text-xs text-earth-100/60">PostGIS RPC로 4개 차원 가중 스코어링</p>
+      </div>
+      <div class="glass rounded-xl p-6 text-center relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-earth-500 text-earth-950 font-black text-sm flex items-center justify-center">3</div>
+        <div class="text-3xl mb-3 mt-2">🌍</div>
+        <div class="font-bold text-earth-200 mb-2">3D 시각화</div>
+        <p class="text-xs text-earth-100/60">react-globe.gl로 지역 polygon 색칠</p>
+      </div>
+      <div class="glass rounded-xl p-6 text-center relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-earth-500 text-earth-950 font-black text-sm flex items-center justify-center">4</div>
+        <div class="text-3xl mb-3 mt-2">📊</div>
+        <div class="font-bold text-earth-200 mb-2">시장 사이징</div>
+        <p class="text-xs text-earth-100/60">합계 면적·국가 수·잠재 매출 카운터</p>
+      </div>
+    </div>
+
+    <!-- Phase 2 highlight -->
+    <div class="reveal mt-16 glass rounded-2xl p-8 md:p-10 bg-gradient-to-br from-earth-900/30 to-yellow-900/20 border-yellow-600/30">
+      <div class="flex items-start gap-4">
+        <div class="text-4xl">🚀</div>
+        <div>
+          <div class="text-yellow-400 text-xs font-semibold tracking-widest mb-2">PHASE 2 · 차별화 포인트</div>
+          <h3 class="text-2xl font-black mb-3">"적합한 곳"에서 "이길 수 있는 곳"으로.</h3>
+          <p class="text-earth-100/80 leading-relaxed">
+            매칭된 지역에 <span class="text-yellow-300 font-semibold">경쟁사 점유율 · 물류비 · 시장가격</span> 데이터를 합쳐
+            "수출하고자 하는 제품의 경쟁력"을 사전에 진단한다.
+            기술 스펙 매칭을 넘어 <span class="text-earth-300 font-semibold">go-to-market 의사결정 도구</span>로 확장.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== PRODUCT MOCK ============== -->
+<section id="product" class="relative py-32 border-t border-earth-900/60">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="reveal text-center max-w-3xl mx-auto mb-16">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">03 · PRODUCT</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        한 화면에서 끝나는<br/>글로벌 시장 매칭.
+      </h2>
+      <p class="text-lg text-earth-100/70">
+        John Deere 9R 트랙터 600HP, 최대 경사 8°, loam/clay, 온대·대륙성, -10~35℃ 입력 →
+        <span class="text-earth-300 font-semibold">북미 평야·우크라이나 흑토·아르헨 팜파스·카자흐 스텝</span>이 초록으로 빛난다.
+      </p>
+    </div>
+
+    <!-- Mock app frame -->
+    <div class="reveal mock-shadow rounded-2xl overflow-hidden bg-[#0c1410] border border-earth-800/50">
+      <!-- Top bar -->
+      <div class="flex items-center gap-2 px-4 py-3 bg-[#0a0e0a] border-b border-earth-900/60">
+        <div class="flex gap-1.5">
+          <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
+        </div>
+        <div class="flex-1 text-center text-xs text-earth-100/40 font-mono">globalagrifit.app</div>
+      </div>
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-earth-900/40">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🌱</span>
+          <span class="font-bold">GlobalAgriFit</span>
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-earth-400"></span>적합</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-yellow-400"></span>보통</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-orange-400"></span>주의</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-500"></span>부적합</span>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="grid lg:grid-cols-[320px_1fr] min-h-[480px]">
+        <!-- Form -->
+        <div class="p-6 border-r border-earth-900/40 space-y-5">
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">카테고리</label>
+            <div class="flex gap-1.5 flex-wrap">
+              <span class="px-2.5 py-1 rounded-md bg-earth-500 text-earth-950 text-xs font-bold">트랙터</span>
+              <span class="px-2.5 py-1 rounded-md bg-earth-900/50 text-earth-100/60 text-xs">수확기</span>
+              <span class="px-2.5 py-1 rounded-md bg-earth-900/50 text-earth-100/60 text-xs">쟁기</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">출력 (HP)</label>
+            <div class="bg-earth-900/40 rounded-lg p-2 text-sm font-mono">600 HP</div>
+          </div>
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">최대 경사 ≤ <span class="text-earth-300">8°</span></label>
+            <div class="h-2 bg-earth-900/60 rounded-full relative">
+              <div class="absolute left-0 top-0 h-full w-[18%] bg-gradient-to-r from-earth-500 to-earth-300 rounded-full"></div>
+              <div class="absolute left-[18%] top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-earth-300"></div>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">호환 토양</label>
+            <div class="flex gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-500/20 text-earth-300 border border-earth-500/40">loam ✓</span>
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-500/20 text-earth-300 border border-earth-500/40">clay ✓</span>
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-500/20 text-earth-300 border border-earth-500/40">chernozem ✓</span>
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-900/40 text-earth-100/40">sand</span>
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-900/40 text-earth-100/40">silt</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">호환 기후</label>
+            <div class="flex gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-500/20 text-earth-300 border border-earth-500/40">온대 ✓</span>
+              <span class="px-2 py-0.5 rounded text-[11px] bg-earth-500/20 text-earth-300 border border-earth-500/40">대륙성 ✓</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-earth-100/50 font-semibold mb-1.5 block">온도 범위</label>
+            <div class="bg-earth-900/40 rounded-lg p-2 text-sm font-mono flex justify-between">
+              <span>-10°C</span><span class="text-earth-100/40">~</span><span>35°C</span>
+            </div>
+          </div>
+          <button class="w-full py-3 rounded-lg bg-gradient-to-r from-earth-500 to-earth-600 text-earth-950 font-black hover:from-earth-400 hover:to-earth-500 transition">
+            매칭하기 →
+          </button>
+        </div>
+
+        <!-- Globe area -->
+        <div class="relative bg-[#06090a] flex flex-col items-center justify-center p-6 min-h-[480px]">
+          <div class="relative w-[320px] h-[320px] rounded-full globe-glow"
+               style="background: radial-gradient(circle at 30% 30%, #16a34a 0%, #15803d 25%, #14532d 50%, #052e16 80%);">
+            <svg viewBox="0 0 320 320" class="absolute inset-0 w-full h-full opacity-60">
+              <ellipse cx="160" cy="160" rx="158" ry="40" fill="none" stroke="rgba(74,222,128,0.18)" stroke-width="1"/>
+              <ellipse cx="160" cy="160" rx="158" ry="90" fill="none" stroke="rgba(74,222,128,0.18)" stroke-width="1"/>
+              <ellipse cx="160" cy="160" rx="40" ry="158" fill="none" stroke="rgba(74,222,128,0.18)" stroke-width="1"/>
+              <ellipse cx="160" cy="160" rx="100" ry="158" fill="none" stroke="rgba(74,222,128,0.18)" stroke-width="1"/>
+            </svg>
+            <div class="marker text-earth-400" style="left: 28%; top: 36%; background: #4ade80;"></div>
+            <div class="marker text-earth-400" style="left: 60%; top: 32%; background: #4ade80;"></div>
+            <div class="marker text-earth-400" style="left: 76%; top: 34%; background: #4ade80;"></div>
+            <div class="marker text-earth-400" style="left: 36%; top: 70%; background: #4ade80;"></div>
+            <div class="marker text-yellow-400" style="left: 53%; top: 38%; background: #facc15;"></div>
+            <div class="marker text-orange-400" style="left: 80%; top: 72%; background: #fb923c;"></div>
+          </div>
+
+          <!-- Stats below globe -->
+          <div class="absolute bottom-6 left-6 right-6 grid grid-cols-3 gap-3">
+            <div class="glass rounded-lg p-3">
+              <div class="text-[10px] text-earth-100/50 font-semibold tracking-wider">적합 지역</div>
+              <div class="text-2xl font-black text-earth-300 ticker">12<span class="text-earth-100/30 text-base"> / 30</span></div>
+            </div>
+            <div class="glass rounded-lg p-3">
+              <div class="text-[10px] text-earth-100/50 font-semibold tracking-wider">사용 가능 농지</div>
+              <div class="text-2xl font-black text-earth-300 ticker">~187<span class="text-earth-100/40 text-base">M ha</span></div>
+            </div>
+            <div class="glass rounded-lg p-3">
+              <div class="text-[10px] text-earth-100/50 font-semibold tracking-wider">잠재 시장</div>
+              <div class="text-2xl font-black text-yellow-300 ticker">$2.4<span class="text-earth-100/40 text-base">B</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo scenarios -->
+    <div class="reveal mt-16 grid md:grid-cols-3 gap-6">
+      <div class="glass rounded-xl p-6">
+        <div class="text-xs text-earth-300 font-semibold mb-2">PRESET 01</div>
+        <div class="font-bold mb-2">John Deere 9R</div>
+        <div class="text-xs text-earth-100/60 font-mono leading-relaxed">600HP · ≤8° · loam,clay<br/>온대 + 대륙성</div>
+        <div class="mt-3 text-xs text-earth-300">→ 12개 지역 매칭</div>
+      </div>
+      <div class="glass rounded-xl p-6">
+        <div class="text-xs text-earth-300 font-semibold mb-2">PRESET 02</div>
+        <div class="font-bold mb-2">Kubota M7</div>
+        <div class="text-xs text-earth-100/60 font-mono leading-relaxed">170HP · ≤15° · loam,silt<br/>온대 + 지중해성</div>
+        <div class="mt-3 text-xs text-earth-300">→ 9개 지역 매칭</div>
+      </div>
+      <div class="glass rounded-xl p-6">
+        <div class="text-xs text-earth-300 font-semibold mb-2">PRESET 03</div>
+        <div class="font-bold mb-2">Massey Ferguson 8S</div>
+        <div class="text-xs text-earth-100/60 font-mono leading-relaxed">300HP · ≤10° · loam,clay,chernozem<br/>대륙성</div>
+        <div class="mt-3 text-xs text-earth-300">→ 14개 지역 매칭</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== MARKET ============== -->
+<section id="market" class="relative py-32 border-t border-earth-900/60 overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-30"></div>
+  <div class="relative max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">04 · MARKET</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        $160B 시장의<br/><span class="grad-text">의사결정 레이어</span>를 점유한다.
+      </h2>
+    </div>
+
+    <div class="reveal grid md:grid-cols-3 gap-6 mt-12">
+      <div class="glass rounded-2xl p-8 transition-all hover:-translate-y-1">
+        <div class="text-earth-500 text-xs font-semibold tracking-widest mb-3">TAM</div>
+        <div class="text-5xl font-black text-earth-300 mb-2 ticker">$160B</div>
+        <div class="text-sm text-earth-100/70">글로벌 농기계 시장 (2024, Statista)</div>
+      </div>
+      <div class="glass rounded-2xl p-8 transition-all hover:-translate-y-1">
+        <div class="text-earth-500 text-xs font-semibold tracking-widest mb-3">SAM</div>
+        <div class="text-5xl font-black text-earth-300 mb-2 ticker">$48B</div>
+        <div class="text-sm text-earth-100/70">수출 의존 비중 30% — 해외영업·수출 의사결정 영역</div>
+      </div>
+      <div class="glass rounded-2xl p-8 transition-all hover:-translate-y-1">
+        <div class="text-earth-500 text-xs font-semibold tracking-widest mb-3">SOM (5y)</div>
+        <div class="text-5xl font-black text-yellow-300 mb-2 ticker">$120M</div>
+        <div class="text-sm text-earth-100/70">상위 200개 제조사 × $50K ARR 평균</div>
+      </div>
+    </div>
+
+    <!-- Customer logos -->
+    <div class="reveal mt-16">
+      <div class="text-earth-100/40 text-xs font-semibold tracking-widest mb-6">초기 타겟 고객</div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="glass rounded-lg p-4 text-center font-bold text-earth-100/80">John Deere</div>
+        <div class="glass rounded-lg p-4 text-center font-bold text-earth-100/80">Kubota</div>
+        <div class="glass rounded-lg p-4 text-center font-bold text-earth-100/80">CNH Industrial</div>
+        <div class="glass rounded-lg p-4 text-center font-bold text-earth-100/80">AGCO</div>
+        <div class="glass rounded-lg p-4 text-center font-bold text-earth-100/80">LS엠트론</div>
+      </div>
+      <p class="mt-6 text-sm text-earth-100/50">
+        → 1차 PoC는 <span class="text-earth-300 font-semibold">전북통상닥터 네트워크 내 한국 농기계 수출 기업</span>으로 시작.
+        창업자가 직접 보유한 거래선·신뢰 자산을 활용한 GTM.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== ROADMAP ============== -->
+<section id="roadmap" class="relative py-32 border-t border-earth-900/60">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">05 · ROADMAP</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        해커톤 데모에서<br/>글로벌 SaaS까지.
+      </h2>
+    </div>
+
+    <div class="mt-16 space-y-8">
+      <!-- Phase 1 -->
+      <div class="reveal glass rounded-2xl p-8 border-l-4 border-l-earth-400">
+        <div class="flex flex-col md:flex-row md:items-center gap-6">
+          <div class="md:w-32 flex-shrink-0">
+            <div class="text-earth-400 text-xs font-bold tracking-widest">PHASE 1</div>
+            <div class="text-2xl font-black">MVP</div>
+            <div class="text-xs text-earth-100/50 mt-1">~ 2026 Q2</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-bold text-lg mb-2">큐레이션 30개 지역 + 매칭 RPC + 3D 글로브</div>
+            <p class="text-sm text-earth-100/70 leading-relaxed">
+              Next.js 14 + Supabase(PostGIS) + react-globe.gl. Natural Earth GeoJSON 기반 30개 농업 지역,
+              4개 차원 가중 스코어링. 해커톤 데모 + 전북통상닥터 네트워크 PoC.
+            </p>
+          </div>
+          <div class="text-3xl">🌱</div>
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div class="reveal glass rounded-2xl p-8 border-l-4 border-l-yellow-400">
+        <div class="flex flex-col md:flex-row md:items-center gap-6">
+          <div class="md:w-32 flex-shrink-0">
+            <div class="text-yellow-400 text-xs font-bold tracking-widest">PHASE 2</div>
+            <div class="text-2xl font-black">경쟁력 진단</div>
+            <div class="text-xs text-earth-100/50 mt-1">2026 Q3 ~ Q4</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-bold text-lg mb-2">경쟁사 점유율 + 물류비 + 시장가격</div>
+            <p class="text-sm text-earth-100/70 leading-relaxed">
+              매칭된 지역에 경쟁 환경 데이터를 합쳐 "이길 수 있는 시장" 판별.
+              UN Comtrade·관세청·해운 운임 API + 자체 크롤러로 데이터 파이프라인 구축.
+            </p>
+          </div>
+          <div class="text-3xl">📈</div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div class="reveal glass rounded-2xl p-8 border-l-4 border-l-orange-400">
+        <div class="flex flex-col md:flex-row md:items-center gap-6">
+          <div class="md:w-32 flex-shrink-0">
+            <div class="text-orange-400 text-xs font-bold tracking-widest">PHASE 3</div>
+            <div class="text-2xl font-black">데이터 정밀화</div>
+            <div class="text-xs text-earth-100/50 mt-1">2027 +</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-bold text-lg mb-2">SoilGrids · WorldClim · FAO GAEZ ETL → 250m 그리드</div>
+            <p class="text-sm text-earth-100/70 leading-relaxed">
+              지역 단위에서 250m 격자 단위로 정밀화. 룰 기반 + ML 매칭(실판매 데이터 학습).
+              회사별 대시보드, 신제품 launch 사이징 리포트, 경쟁사 비교 SaaS로 확장.
+            </p>
+          </div>
+          <div class="text-3xl">🚀</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== TECH ============== -->
+<section id="tech" class="relative py-32 border-t border-earth-900/60 overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-30"></div>
+  <div class="relative max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">06 · TECH</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        검증된 스택,<br/>1시간에 데모를 만든 속도.
+      </h2>
+    </div>
+
+    <div class="reveal grid md:grid-cols-3 gap-4 mt-12">
+      <div class="glass rounded-xl p-5">
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">FRONTEND</div>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><span class="text-earth-100/70">Framework</span><span class="font-mono text-earth-300">Next.js 14</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Language</span><span class="font-mono text-earth-300">TypeScript</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Style</span><span class="font-mono text-earth-300">Tailwind</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Globe</span><span class="font-mono text-earth-300">react-globe.gl</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Form</span><span class="font-mono text-earth-300">RHF + zod</span></div>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">BACKEND / DATA</div>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><span class="text-earth-100/70">DB</span><span class="font-mono text-earth-300">Postgres</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">GIS</span><span class="font-mono text-earth-300">PostGIS</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">BaaS</span><span class="font-mono text-earth-300">Supabase</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">API</span><span class="font-mono text-earth-300">Next API Routes</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Logic</span><span class="font-mono text-earth-300">SQL RPC</span></div>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">DATA SOURCE</div>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><span class="text-earth-100/70">Geometry</span><span class="font-mono text-earth-300">Natural Earth</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Soil (P3)</span><span class="font-mono text-earth-300">SoilGrids</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Climate (P3)</span><span class="font-mono text-earth-300">WorldClim</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Crop (P3)</span><span class="font-mono text-earth-300">FAO GAEZ</span></div>
+          <div class="flex justify-between"><span class="text-earth-100/70">Trade (P2)</span><span class="font-mono text-earth-300">UN Comtrade</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Algorithm snippet -->
+    <div class="reveal mt-12 glass rounded-2xl p-6 md:p-8 font-mono text-xs md:text-sm overflow-x-auto">
+      <div class="text-earth-500 text-[10px] font-sans font-bold tracking-widest mb-3">CORE MATCHING — Supabase RPC</div>
+<pre class="text-earth-100/90 leading-relaxed"><span class="text-purple-300">create function</span> match_equipment(p_max_slope, p_soils, p_climates, p_min_temp, p_max_temp)
+<span class="text-purple-300">returns table</span> (id, name, country, geometry, fit_score, area_ha) <span class="text-purple-300">as</span> $$
+  <span class="text-purple-300">select</span>
+    r.id, r.name, r.country,
+    st_asgeojson(r.geom)::json <span class="text-purple-300">as</span> geometry,
+    (
+      (<span class="text-purple-300">case when</span> r.soil_type = <span class="text-purple-300">any</span>(p_soils) <span class="text-purple-300">then</span> 1 <span class="text-purple-300">else</span> 0 <span class="text-purple-300">end</span>) +
+      (<span class="text-purple-300">case when</span> r.climate_zone = <span class="text-purple-300">any</span>(p_climates) <span class="text-purple-300">then</span> 1 <span class="text-purple-300">else</span> 0 <span class="text-purple-300">end</span>) +
+      (<span class="text-purple-300">case when</span> r.avg_slope_deg &lt;= p_max_slope <span class="text-purple-300">then</span> 1 <span class="text-purple-300">else</span> 0 <span class="text-purple-300">end</span>) +
+      (<span class="text-purple-300">case when</span> r.avg_temp_c <span class="text-purple-300">between</span> p_min_temp <span class="text-purple-300">and</span> p_max_temp <span class="text-purple-300">then</span> 1 <span class="text-purple-300">else</span> 0 <span class="text-purple-300">end</span>)
+    )::numeric / 4 <span class="text-purple-300">as</span> <span class="text-yellow-300">fit_score</span>,  <span class="text-earth-100/40">-- 4개 차원 가중 평균</span>
+    r.area_ha
+  <span class="text-purple-300">from</span> regions r
+  <span class="text-purple-300">where</span> r.avg_slope_deg &lt;= p_max_slope;  <span class="text-earth-100/40">-- 하드 컷오프</span>
+$$;</pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== TEAM / CONTACT ============== -->
+<section id="team" class="relative py-32 border-t border-earth-900/60">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal">
+      <div class="text-earth-500 text-sm font-semibold tracking-widest mb-4">07 · TEAM</div>
+      <h2 class="text-4xl md:text-5xl font-black mb-6 leading-tight">
+        도메인을 직접 살아본 팀.
+      </h2>
+    </div>
+
+    <div class="reveal mt-12 glass rounded-2xl p-8 md:p-10">
+      <div class="flex flex-col md:flex-row gap-8">
+        <div class="flex-shrink-0 w-24 h-24 rounded-2xl bg-gradient-to-br from-earth-400 to-earth-700 flex items-center justify-center text-4xl">👨‍🌾</div>
+        <div class="flex-1">
+          <div class="text-earth-300 text-xs font-bold tracking-widest mb-1">FOUNDER</div>
+          <h3 class="text-2xl font-black mb-2">전북통상닥터 · 농기계 수출 지원</h3>
+          <p class="text-earth-100/80 leading-relaxed mb-4">
+            여러 농기계 회사의 수출을 현장에서 지원하며 <span class="text-earth-300 font-semibold">"매번 같은 정보를 수작업으로 매칭하는 비효율"</span>을
+            반복적으로 목격. 바이어가 원하는 정보(토양·경사·작물)와 제품 사양을 빠르게 매칭하는 도구가 없다는 것을 직접 체감하고
+            이 제품의 첫 번째 사용자가 되었다.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-3 py-1 rounded-full bg-earth-900/60 text-xs text-earth-300">통상 도메인</span>
+            <span class="px-3 py-1 rounded-full bg-earth-900/60 text-xs text-earth-300">농기계 수출 네트워크</span>
+            <span class="px-3 py-1 rounded-full bg-earth-900/60 text-xs text-earth-300">초기 고객 직접 보유</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============== CTA ============== -->
+<section id="contact" class="relative py-32 border-t border-earth-900/60 overflow-hidden">
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(34,197,94,0.20) 0%, transparent 60%);"></div>
+  <div class="relative max-w-4xl mx-auto px-6 text-center">
+    <h2 class="text-5xl md:text-6xl font-black leading-tight mb-6">
+      한 번의 입력,<br/><span class="grad-text">전 세계 시장의 답.</span>
+    </h2>
+    <p class="text-lg md:text-xl text-earth-100/70 mb-10 max-w-2xl mx-auto">
+      농기계 제조사의 수출 의사결정을 30초 안에. 지금 바로 데모를 보거나, 함께할 분을 찾고 있습니다.
+    </p>
+    <div class="flex flex-wrap justify-center gap-4">
+      <a href="mailto:tagryu22@gmail.com" class="px-8 py-4 rounded-xl bg-earth-500 hover:bg-earth-400 text-earth-950 font-black text-lg transition flex items-center gap-2 group">
+        Contact Founder
+        <span class="group-hover:translate-x-1 transition">→</span>
+      </a>
+      <a href="#product" class="px-8 py-4 rounded-xl border border-earth-600/50 hover:border-earth-400 text-earth-100 font-bold text-lg transition">
+        제품 다시 보기
+      </a>
+    </div>
+
+    <div class="mt-16 pt-8 border-t border-earth-900/60 grid grid-cols-2 md:grid-cols-4 gap-6 text-left">
+      <div>
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">EMAIL</div>
+        <div class="text-sm font-mono text-earth-100/80">tagryu22@gmail.com</div>
+      </div>
+      <div>
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">EVENT</div>
+        <div class="text-sm text-earth-100/80">한양대 해커톤 2026</div>
+      </div>
+      <div>
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">STAGE</div>
+        <div class="text-sm text-earth-100/80">Pre-Seed · MVP</div>
+      </div>
+      <div>
+        <div class="text-xs text-earth-500 font-bold tracking-widest mb-2">LOOKING FOR</div>
+        <div class="text-sm text-earth-100/80">Pilot Customers · Co-founder</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-earth-900/60 py-8">
+  <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex items-center gap-2 text-earth-100/40 text-sm">
+      <span>🌍</span>
+      <span class="font-bold">GlobalAgriFit</span>
+      <span>·</span>
+      <span>2026</span>
+    </div>
+    <div class="text-xs text-earth-100/30">
+      A B2B SaaS for agricultural equipment exporters.
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -80px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
