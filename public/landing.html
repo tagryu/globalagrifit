@@ -92,6 +92,9 @@
     box-sizing: border-box;
     display: grid;
     align-content: center;
+    /* Top padding so fixed nav doesn't overlap content */
+    padding-top: 5rem;
+    padding-bottom: 3rem;
   }
   /* Bigger headings on wide screens so they don't look small */
   @media (min-width: 1536px) {
@@ -219,14 +222,14 @@
       <a href="#roadmap" class="hover:text-earth-300 transition">Roadmap</a>
       <a href="#team" class="hover:text-earth-300 transition">Team</a>
     </div>
-    <a href="#contact" class="text-sm bg-earth-500 hover:bg-earth-400 text-earth-950 font-semibold px-4 py-2 rounded-lg transition">
-      Contact →
+    <a href="/" class="text-sm bg-earth-500 hover:bg-earth-400 text-earth-950 font-semibold px-4 py-2 rounded-lg transition">
+      시작하기 →
     </a>
   </div>
 </nav>
 
 <!-- ============== HERO ============== -->
-<section id="top" class="relative min-h-screen pt-32 pb-24 overflow-hidden">
+<section id="top" class="relative min-h-screen overflow-hidden">
   <div class="absolute inset-0 grid-bg opacity-50"></div>
   <div class="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
 
