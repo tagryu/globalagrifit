@@ -83,21 +83,28 @@
     display: block;
     white-space: nowrap;
   }
-  /* One section per scroll */
+  /* One section per scroll. Section content is vertically centered. */
   section,
   footer {
     scroll-snap-align: start;
     scroll-snap-stop: always;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    box-sizing: border-box;
+    display: grid;
+    align-content: center;
   }
-  /* Hero already pads via pt-32 — keep it as-is by allowing flex-start */
-  section#top { justify-content: flex-start; }
+  /* Bigger headings on wide screens so they don't look small */
+  @media (min-width: 1536px) {
+    .hero-title { font-size: clamp(2.5rem, 5.5vw, 6.5rem); }
+  }
+  @media (min-width: 1920px) {
+    body { font-size: 17px; }
+    .section-title { font-size: clamp(3rem, 4vw, 5rem) !important; }
+  }
   /* Allow inner-section scrolling when content is taller than viewport */
   @media (max-height: 720px) {
     html { scroll-snap-type: y proximity; }
+    section, footer { min-height: 0; }
   }
   /* Grid background */
   .grid-bg {
