@@ -67,6 +67,21 @@
     -webkit-font-smoothing: antialiased;
     background: #0a0e0a;
     color: #e7f5e9;
+    /* Prevent Korean syllable mid-word wrapping */
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  /* Distribute heading lines evenly */
+  h1, h2, h3 { text-wrap: balance; }
+  /* Hero headline: always 3 lines, fluid sizing */
+  .hero-title {
+    font-size: clamp(1.625rem, 6vw, 4.5rem);
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+  }
+  .hero-title > .line {
+    display: block;
+    white-space: nowrap;
   }
   /* One section per scroll */
   section,
@@ -215,10 +230,10 @@
         2026 한양대 해커톤 · IR Pitch
       </div>
 
-      <h1 class="text-5xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight">
-        전 세계 농지에서<br/>
-        <span class="grad-text">우리 농기구가 통하는 곳</span>을<br/>
-        <span class="text-earth-100">30초 만에.</span>
+      <h1 class="hero-title font-black">
+        <span class="line">전 세계 농지에서</span>
+        <span class="line"><span class="grad-text">우리 농기구가 통하는 곳</span>을</span>
+        <span class="line text-earth-100">30초 만에.</span>
       </h1>
 
       <p class="text-lg md:text-xl text-earth-100/70 leading-relaxed max-w-xl">
