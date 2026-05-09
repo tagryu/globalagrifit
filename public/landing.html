@@ -58,12 +58,31 @@
   }
 </script>
 <style>
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
+  }
   body {
     font-family: 'Pretendard', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     background: #0a0e0a;
     color: #e7f5e9;
+  }
+  /* One section per scroll */
+  section,
+  footer {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  /* Hero already pads via pt-32 — keep it as-is by allowing flex-start */
+  section#top { justify-content: flex-start; }
+  /* Allow inner-section scrolling when content is taller than viewport */
+  @media (max-height: 720px) {
+    html { scroll-snap-type: y proximity; }
   }
   /* Grid background */
   .grid-bg {
